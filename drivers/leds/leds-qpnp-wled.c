@@ -108,7 +108,6 @@
 #define QPNP_WLED_BOOST_DUTY_MAX_NS	156
 #define QPNP_WLED_DEF_BOOST_DUTY_NS	104
 #define QPNP_WLED_SWITCH_FREQ_MASK	GENMASK(3, 0)
-#define QPNP_WLED_SWITCH_FREQ_600_KHZ	600
 #define QPNP_WLED_SWITCH_FREQ_OVERWRITE BIT(7)
 #define QPNP_WLED_OVP_MASK		GENMASK(1, 0)
 #define QPNP_WLED_TEST4_EN_DEB_BYPASS_ILIM_BIT	BIT(6)
@@ -188,7 +187,6 @@
 #define QPNP_WLED_SINK_TEST5_DIG	0x1E
 #define QPNP_WLED_SINK_TEST5_HVG_PULL_STR_BIT	BIT(3)
 
-#define QPNP_WLED_SWITCH_FREQ_600_KHZ_CODE	0x0F
 #define QPNP_WLED_SWITCH_FREQ_800_KHZ_CODE	0x0B
 #define QPNP_WLED_SWITCH_FREQ_1600_KHZ_CODE	0x05
 
@@ -445,6 +443,8 @@ static int qpnp_wled_step_delay_gain = 2;
 module_param_named(
 	step_delay_gain, qpnp_wled_step_delay_gain, int, 0600
 );
+
+static int first_set_prev_state = 0;
 
 /* helper to read a pmic register */
 static int qpnp_wled_read_reg(struct qpnp_wled *wled, u16 addr, u8 *data)
@@ -1147,6 +1147,10 @@ static void qpnp_wled_work(struct work_struct *work)
 		}
 	}
 
+	if (1 == first_set_prev_state) {
+		wled->prev_state = true;
+		first_set_prev_state = 0;
+	}
 	if (!!level != wled->prev_state) {
 		if (!!level) {
 			/*
@@ -2012,10 +2016,6 @@ static int qpnp_wled_config(struct qpnp_wled *wled)
 	/* Configure the SWITCHING FREQ register */
 	if (wled->switch_freq_khz == 1600)
 		reg = QPNP_WLED_SWITCH_FREQ_1600_KHZ_CODE;
-#ifdef CONFIG_MACH_XIAOMI_OXYGEN
-	else if (wled->switch_freq_khz == QPNP_WLED_SWITCH_FREQ_600_KHZ)
-		reg = QPNP_WLED_SWITCH_FREQ_600_KHZ_CODE;
-#endif
 	else
 		reg = QPNP_WLED_SWITCH_FREQ_800_KHZ_CODE;
 
@@ -2766,6 +2766,11 @@ static int qpnp_wled_probe(struct platform_device *pdev)
 		return rc;
 	}
 
+	if (strnstr(saved_command_line, "androidboot.mode=ffbm-01",
+		    strlen(saved_command_line))) {
+		printk("linson in ffbm mode\n");
+		first_set_prev_state = 1;
+	}
 	INIT_WORK(&wled->work, qpnp_wled_work);
 	wled->ramp_ms = QPNP_WLED_RAMP_DLY_MS;
 	wled->ramp_step = 1;
