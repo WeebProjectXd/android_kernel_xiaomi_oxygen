@@ -425,13 +425,13 @@ module_param_named(
 	parallel_en, smbchg_parallel_en, int, 00600
 );
 
-static int smbchg_main_chg_fcc_percent = 40;
+static int smbchg_main_chg_fcc_percent = 50;
 module_param_named(
 	main_chg_fcc_percent, smbchg_main_chg_fcc_percent,
 	int, 00600
 );
 
-static int smbchg_main_chg_icl_percent = 50;
+static int smbchg_main_chg_icl_percent = 60;
 module_param_named(
 	main_chg_icl_percent, smbchg_main_chg_icl_percent,
 	int, 00600
@@ -1008,22 +1008,6 @@ static int get_property_from_fg(struct smbchg_chip *chip,
 	return rc;
 }
 
-#define DEFAULT_BATT_CAPACITY_FULL	3000000
-#define MAX_BATT_CAPACITY_FULL	5300000
-static int get_prop_batt_capacity_full(struct smbchg_chip *chip)
-{
-	int uah, rc;
-
-	rc = get_property_from_fg(chip, POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN, &uah);
-	if (rc) {
-		pr_smb(PR_STATUS, "Couldn't get capacity full rc = %d\n", rc);
-		uah = DEFAULT_BATT_CAPACITY_FULL;
-	}
-	if (uah >= MAX_BATT_CAPACITY_FULL)
-		uah = MAX_BATT_CAPACITY_FULL;
-	return uah;
-}
-
 #define DEFAULT_BATT_CAPACITY	50
 static int get_prop_batt_capacity(struct smbchg_chip *chip)
 {
@@ -1132,19 +1116,6 @@ static int get_prop_batt_health(struct smbchg_chip *chip)
 		return POWER_SUPPLY_HEALTH_COOL;
 	else
 		return POWER_SUPPLY_HEALTH_GOOD;
-}
-
-static int get_prop_batt_profile(struct smbchg_chip *chip)
-{
-	int profile_status, rc;
-
-	rc = get_property_from_fg(chip,
-			POWER_SUPPLY_PROP_PROFILE_STATUS, &profile_status);
-	if (rc) {
-		pr_smb(PR_STATUS, "Couldn't get profile status rc = %d\n", rc);
-		profile_status = 0;
-	}
-	return profile_status;
 }
 
 static void get_property_from_typec(struct smbchg_chip *chip,
@@ -1920,7 +1891,7 @@ static int smbchg_set_fastchg_current_raw(struct smbchg_chip *chip,
 #define USBIN_ACTIVE_PWR_SRC_BIT	BIT(1)
 #define DCIN_ACTIVE_PWR_SRC_BIT		BIT(0)
 #define PARALLEL_REENABLE_TIMER_MS	1000
-#define PARALLEL_CHG_THRESHOLD_CURRENT	1850
+#define PARALLEL_CHG_THRESHOLD_CURRENT	1800
 static bool smbchg_is_usbin_active_pwr_src(struct smbchg_chip *chip)
 {
 	int rc;
@@ -5678,7 +5649,6 @@ static enum power_supply_property smbchg_battery_properties[] = {
 	POWER_SUPPLY_PROP_SYSTEM_TEMP_LEVEL,
 	POWER_SUPPLY_PROP_FLASH_CURRENT_MAX,
 	POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX,
-	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
 	POWER_SUPPLY_PROP_CURRENT_MAX,
@@ -5700,7 +5670,6 @@ static enum power_supply_property smbchg_battery_properties[] = {
 	POWER_SUPPLY_PROP_RESTRICTED_CHARGING,
 	POWER_SUPPLY_PROP_ALLOW_HVDCP3,
 	POWER_SUPPLY_PROP_MAX_PULSE_ALLOWED,
-	POWER_SUPPLY_PROP_PROFILE_STATUS,
 };
 
 static int smbchg_battery_set_property(struct power_supply *psy,
@@ -5844,9 +5813,6 @@ static int smbchg_battery_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CHARGE_TYPE:
 		val->intval = get_prop_charge_type(chip);
 		break;
-	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
-		val->intval = get_prop_batt_capacity_full(chip);
-		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
 		val->intval = smbchg_float_voltage_get(chip);
 		break;
@@ -5857,7 +5823,7 @@ static int smbchg_battery_get_property(struct power_supply *psy,
 		val->intval = get_prop_batt_health(chip);
 		break;
 	case POWER_SUPPLY_PROP_TECHNOLOGY:
-		val->intval = POWER_SUPPLY_TECHNOLOGY_LIPO;
+		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
 		break;
 	case POWER_SUPPLY_PROP_FLASH_CURRENT_MAX:
 		val->intval = smbchg_calc_max_flash_current(chip);
@@ -5929,9 +5895,6 @@ static int smbchg_battery_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_MAX_PULSE_ALLOWED:
 		val->intval = chip->max_pulse_allowed;
-		break;
-	case POWER_SUPPLY_PROP_PROFILE_STATUS:
-		val->intval = get_prop_batt_profile(chip);
 		break;
 	default:
 		return -EINVAL;
